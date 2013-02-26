@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script type="text/javascript" src="lib/paper.js"></script>
+	<script type="text/paperscript" canvas="canvas">
+	var scene = new Group();
+	scene.position = view.center;
+	
+	var score = 0;
+	var scoreText = new PointText(new Point(0, -320));
+	scoreText.paragraphStyle.justification = 'center';
+	scoreText.fillColor = 'black';
+	scoreText.fontSize = 60;
+	scoreText.content = 0;
+	
+	var disc = new Path.Circle(new Point(0, 0), 300);
+	disc.fillColor = 'black';
+		
+	var knobs = new Group (
+		new Path.Circle(new Point(280, 0), 15),
+		new Path.Circle(new Point(-280, 0), 15)
+	);
+	knobs.fillColor = 'white';
+	
+	scene.addChild(disc);	
+	scene.addChild(knobs);
+	scene.addChild(scoreText);
+	
+	var deadlyBulletColor = '#d22341';
+	var pointBulletColor = '#677cea';
+	var spinningSpeed = 0.5;
+	
+	var bullets = new Group();
+	scene.addChild(bullets);
+	
+	setInterval(spawnRandomRedPattern, 3000);
+	setInterval(spawnRandomBluePattern, 2000);
+	
+	var redPatterns = [
+		function () { 
+			spawnCircle('red', 10, 0, 0); 
+		},
+		function () { 
+			spawnCircle('red', 5, 1 * Math.PI / 3, 0);
+			spawnCircle('red', 5, 2 * Math.PI / 3, 1000); 
+			spawnCircle('red', 5, 3 * Math.PI / 3, 2000); 
+		},
+		function () { 
+			spawnSpiral('red', 25, 100, 3, 0); 
+		},
+		function () { 
+			spawnSpiral('red', 15, 200, 0.5, 0);
+			spawnSpiral('red', 15, 200, 0.5, Math.PI);
+		}
+	];
+	
+	var bluePatterns = [
+		function () {
+			spawnCircle('blue', 1, 2 * Math.PI * Math.random(), 0);
+		}
+	];
+		
+	function spawnSpiral(color, amount, delay, spread, offset) {
+		var totalDelay = 0;
+		for (var i = 0; i < amount; i++) {
+			setTimeout(function (r) {
+				spawnBullet(color, offset + spread * 2 * Math.PI * r / amount, 1.5);
+			}, totalDelay, i);
+			totalDelay += delay;
+		}
+	}
+	
+	function spawnCircle(color, amount, offset, delay) {
+		setTimeout(function () {
+			for (var i = 0; i < amount; i++) {
+				spawnBullet(color, offset + 2 * Math.PI * i / amount, 1.5);
+			}
+		}, delay);
+	}
+	
+	function spawnBullet(color, angle, speed) {
+		var bullet = new Path.Circle(new Point(0, 0), 10);
+		bullet.fillColor = deadlyBulletColor;
+		bullet.velocity = { x: speed * Math.cos(angle), y: speed * Math.sin(angle) };
+		bullets.addChild(bullet);
+		
+		if (color == 'blue') {
+			setInterval(function () {
+				bullet.fillColor = pointBulletColor;
+				setTimeout(function () {
+					bullet.fillColor = 'white';
+				}, 100);
+			}, 150);
+		} else {
+			bullet.deadly = true;
+		}
+	}
+	
+	function spawnRandomRedPattern() {
+		redPatterns[Math.floor(Math.random() * redPatterns.length)]();
+	}
+	
+	function spawnRandomBluePattern() {
+		bluePatterns[Math.floor(Math.random() * bluePatterns.length)]();
+	}
+	
+	function removeEscapedBullets() {
+		bullets.children.forEach(function (bullet) {
+			if (bullet.position.length > 345) {
+				bullet.remove();
+			}
+		});
+	}
+	
+	function fadeoutEscapedBullet() {
+		bullets.children.forEach(function (bullet) {
+			if (bullet.position.length > 300) {
+				bullet.opacity = (350.0 - bullet.position.length) / 100.0;
+			}
+		});
+	}
+	
+	function flashDisc() {
+		disc.fillColor = 'white';
+		setTimeout(function () {
+			disc.fillColor = 'black';
+		}, 10);
+	}
+	
+	function knobCollisionTests() {
+		knobs.children.forEach(function (knob) {
+			bulletCollisionTest(knob.position);
+		});
+	}
+	
+	function bulletCollisionTest(position) {
+		var result = bullets.hitTest(position, { fill: true, stroke: true, segments: true, tolerance: 15 });
+		if (result && !result.item.dead) {
+			result.item.dead = true;
+			
+			if (result.item.deadly) {
+				result.item.fillColor = 'black';
+				score = 0;
+				scoreText.content = score;
+				flashDisc();
+			} else {
+				score += 1;
+				scoreText.content = score;
+				result.item.remove();
+			}
+		}
+	}
+	
+	function moveBullets() {
+		bullets.children.forEach(function (bullet) {
+			bullet.position = bullet.position + bullet.velocity;
+		});
+	}
+	
+	function rotateKnobs() {
+		knobs.children.forEach(function (knob) {
+			knob.rotate(spinningSpeed, { x: 0, y: 0 });
+		});
+	}
+		
+	function onFrame(event) {
+		rotateKnobs();
+		moveBullets();
+		removeEscapedBullets();
+		fadeoutEscapedBullet();
+		knobCollisionTests();
+	}
+	
+	function onMouseMove(event) {
+		spinningSpeed += event.delta.x * 0.005;
+		spinningSpeed = Math.max(Math.min(spinningSpeed, 2.0), -2.0);
+	}
+	</script>
+</head>
+<body>
+	<canvas id="canvas" resize></canvas>
+</body>
+</html>
